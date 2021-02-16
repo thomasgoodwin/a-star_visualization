@@ -1,6 +1,7 @@
 import pygame
 from queue import PriorityQueue
 import math
+import tkinter as tk
  
 # Define some colors
 BLACK = (0, 0, 0)
@@ -95,7 +96,9 @@ def octile_heuristic(point, dest, weight):
     return ((min(xDiff, yDiff) * math.sqrt(weight * weight * 2)) + max(xDiff, yDiff) - min(xDiff, yDiff)) * weight
 
 HEURISTIC = euclidean_heuristic
-HEURISTIC_WEIGHT = 1.0
+
+heuristic_table = {"euclidean": euclidean_heuristic, "manhattan": manhattan_heuristic, 
+                    "chebbyshev": chebbyshev_heuristic, "octile": octile_heuristic }
 
 def process_valid_neighbors():
     for i in range(0, GRID_SIZE):
@@ -179,7 +182,7 @@ def solve_astar():
                     newG = cell_info[curr_i][curr_j].g + DIAGONAL_COST
                 else:
                     newG = cell_info[curr_i][curr_j].g + ORTHOGONAL_COST
-                newH = HEURISTIC(next_node, end_coords, HEURISTIC_WEIGHT)
+                newH = heuristic_table[selected_heuristic.get()](next_node, end_coords, weight_variable.get())
                 newF = newH + newG
                 if cell_info[next_node[ROW]][next_node[COL]].f > newF:
                     cell_info[next_node[ROW]][next_node[COL]].parent_i = curr_i
@@ -189,7 +192,50 @@ def solve_astar():
                     open_list.put((newF, next_node))
     return []
 
-# -------- Main Program Loop -----------
+def verify_coordinates(row, col):
+    if row < 0 or row >= GRID_SIZE:
+        return False
+    if col < 0 or col >= GRID_SIZE:
+        return False
+    return True
+
+# -------- tkinker -----------
+window = tk.Tk()
+window.geometry("220x150")
+window.title("Options")
+selected_heuristic = tk.StringVar(window)
+heuristic_options = [
+    "euclidean",
+    "manhattan",
+    "chebbyshev",
+    "octile"
+]
+sel_heur_text = tk.StringVar()
+sel_heur_label = tk.Label( window, textvariable=sel_heur_text)
+sel_heur_text.set("Heuristic Method:")
+sel_heur_label.pack()
+selected_heuristic.set(heuristic_options[0]) # euclidean default
+
+heuristic_dropdown = tk.OptionMenu(window, selected_heuristic, *heuristic_options)
+heuristic_dropdown.pack()
+
+sel_heur_text = tk.StringVar()
+sel_heur_label = tk.Label( window, textvariable=sel_heur_text)
+sel_heur_text.set("Heuristic Value:")
+sel_heur_label.pack()
+
+weight_variable = tk.DoubleVar()
+weight_variable.set(1.0)
+heuristic_weight = tk.Scale(window, from_=-10.0, to=10.0, resolution=0.1, orient=tk.HORIZONTAL, variable=weight_variable)
+heuristic_weight.pack()
+
+smoothing_flag = tk.IntVar()
+smoothing_cb = tk.Checkbutton(window, text='Smoothing',variable=smoothing_flag, onvalue=1, offvalue=0)
+smoothing_cb.pack()
+
+window.mainloop()
+
+# -------- main loop -----------
 while not done:
     for event in pygame.event.get(): 
         if event.type == pygame.QUIT:  
@@ -212,51 +258,53 @@ while not done:
         # Change the x/y screen coordinates to grid coordinates
         column = pos[0] // (WIDTH + MARGIN)
         row = pos[1] // (HEIGHT + MARGIN)
-        # Set that location to BLOCKED
-        grid[row][column] = BLOCKED
-        if row == start_coords[ROW] and column == start_coords[COL]:
-            start_coords = (-1, -1)
+        if verify_coordinates(row, column) == True:
+            # Set that location to BLOCKED
+            grid[row][column] = BLOCKED
+            if row == start_coords[ROW] and column == start_coords[COL]:
+                start_coords = (-1, -1)
 
-        if row == end_coords[ROW] and column == end_coords[COL]:
-            end_coords = (-1, -1)
+            if row == end_coords[ROW] and column == end_coords[COL]:
+                end_coords = (-1, -1)
     
     if pygame.mouse.get_pressed()[2]: # right mouse button
         pos = pygame.mouse.get_pos()
         # Change the x/y screen coordinates to grid coordinates
         column = pos[ROW] // (WIDTH + MARGIN)
         row = pos[COL] // (HEIGHT + MARGIN)
-        # Set that location to one
-        grid[row][column] = OPEN
-        if row == start_coords[ROW] and column == start_coords[COL]:
-            start_coords = (-1, -1)
+        if verify_coordinates(row, column) == True:
+            # Set that location to one
+            grid[row][column] = OPEN
+            if row == start_coords[ROW] and column == start_coords[COL]:
+                start_coords = (-1, -1)
 
-        if row == end_coords[ROW] and column == end_coords[COL]:
-            end_coords = (-1, -1)
+            if row == end_coords[ROW] and column == end_coords[COL]:
+                end_coords = (-1, -1)
 
     pressed = pygame.key.get_pressed()
     if pressed[pygame.K_s]:
         pos = pygame.mouse.get_pos()
         column = pos[ROW] // (WIDTH + MARGIN)
         row = pos[1] // (HEIGHT + MARGIN)
-
-        if (start_coords[ROW] != -1 and start_coords[COL] != -1):
-            grid[start_coords[ROW]][start_coords[COL]] = OPEN
-        if(grid[row][column] == END):
-            end_coords = (-1,-1)
-        start_coords = (row, column)
-        grid[row][column] = START
+        if verify_coordinates(row, column) == True:
+            if (start_coords[ROW] != -1 and start_coords[COL] != -1):
+                grid[start_coords[ROW]][start_coords[COL]] = OPEN
+            if (grid[row][column] == END):
+                end_coords = (-1,-1)
+            start_coords = (row, column)
+            grid[row][column] = START
 
     if pressed[pygame.K_e]:
         pos = pygame.mouse.get_pos()
         column = pos[0] // (WIDTH + MARGIN)
         row = pos[1] // (HEIGHT + MARGIN)
-
-        if (end_coords[ROW] != -1 and end_coords[COL] != -1):
-            grid[end_coords[ROW]][end_coords[COL]] = OPEN
-        if(grid[row][column] == START):
-            start_coords = (-1,-1)
-        end_coords = (row, column)
-        grid[row][column] = END
+        if verify_coordinates(row, column) == True:
+            if (end_coords[ROW] != -1 and end_coords[COL] != -1):
+                grid[end_coords[ROW]][end_coords[COL]] = OPEN
+            if (grid[row][column] == START):
+                start_coords = (-1,-1)
+            end_coords = (row, column)
+            grid[row][column] = END
 
     screen.fill(BLACK)
 
@@ -276,8 +324,7 @@ while not done:
                              color,
                              [(MARGIN + WIDTH) * column + MARGIN,
                               (MARGIN + HEIGHT) * row + MARGIN,
-                              WIDTH,
-                              HEIGHT])
+                              WIDTH, HEIGHT])
     clock.tick(60)
     pygame.display.flip()
  
