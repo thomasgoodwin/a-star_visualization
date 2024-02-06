@@ -2,7 +2,8 @@ import pygame
 from queue import PriorityQueue
 import math
 import tkinter as tk
- 
+import time
+
 # Define some colors
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -10,6 +11,9 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 SILVER = (60,60,60)
+ORCHID = (218,112,214)
+LIGHT_GREY = (170,170,170) 
+DARK_GREY = (100,100,100) 
 
 # Value Codes 
 START = -1
@@ -18,6 +22,7 @@ END = -2
 OPEN = 0
 BLOCKED = 1
 PATH = 3
+CHECKED = 4
  
 # This sets the WIDTH and HEIGHT of each grid location
 WIDTH = 20
@@ -68,7 +73,7 @@ for row in range(GRID_SIZE):
         cell_info[row].append(Cell())
 
 # Set the HEIGHT and WIDTH of the screen
-WINDOW_SIZE = [int(WIDTH * GRID_SIZE * 1.26), int(HEIGHT * GRID_SIZE * 1.26)]
+WINDOW_SIZE = [int(WIDTH * GRID_SIZE * 1.26) + 200, int(HEIGHT * GRID_SIZE * 1.26) ]
 screen = pygame.display.set_mode(WINDOW_SIZE)
  
 start_coords = (-1,-1)
@@ -95,10 +100,11 @@ def octile_heuristic(point, dest, weight):
     yDiff = abs(point[COL] - dest[COL])
     return ((min(xDiff, yDiff) * math.sqrt(weight * weight * 2)) + max(xDiff, yDiff) - min(xDiff, yDiff)) * weight
 
-HEURISTIC = euclidean_heuristic
+def no_heuristic(point, dest, weight):
+    return 0
 
 heuristic_table = {"euclidean": euclidean_heuristic, "manhattan": manhattan_heuristic, 
-                    "chebbyshev": chebbyshev_heuristic, "octile": octile_heuristic }
+                    "chebbyshev": chebbyshev_heuristic, "octile": octile_heuristic, "dijkstra": no_heuristic}
 
 def process_valid_neighbors():
     for i in range(0, GRID_SIZE):
@@ -112,7 +118,7 @@ def process_valid_neighbors():
             cell_info[i][j].parent_i = -1
             cell_info[i][j].parent_j = -1
 
-            if grid[i][j] == PATH: # clean up last path
+            if grid[i][j] == PATH or grid[i][j] == CHECKED: # clean up last path
                 grid[i][j] = OPEN
 
             # N case
@@ -178,11 +184,12 @@ def solve_astar():
             newH = 0.0
             newF = 0.0
             if not cell_info[next_node[ROW]][next_node[COL]].on_closed_list:
+                grid[next_node[ROW]][next_node[COL]] = CHECKED
                 if next_node[ROW] != curr_i and next_node[COL] != curr_j:
                     newG = cell_info[curr_i][curr_j].g + DIAGONAL_COST
                 else:
                     newG = cell_info[curr_i][curr_j].g + ORTHOGONAL_COST
-                newH = heuristic_table[selected_heuristic.get()](next_node, end_coords, weight_variable.get())
+                newH = heuristic_table[selected_heuristic](next_node, end_coords, 1) # weight variable disabled
                 newF = newH + newG
                 if cell_info[next_node[ROW]][next_node[COL]].f > newF:
                     cell_info[next_node[ROW]][next_node[COL]].parent_i = curr_i
@@ -203,39 +210,50 @@ def verify_coordinates(row, col):
 window = tk.Tk()
 window.geometry("220x150")
 window.title("Options")
-selected_heuristic = tk.StringVar(window)
 heuristic_options = [
     "euclidean",
     "manhattan",
     "chebbyshev",
-    "octile"
+    "octile",
+    "dijkstra"
 ]
-sel_heur_text = tk.StringVar()
-sel_heur_label = tk.Label( window, textvariable=sel_heur_text)
-sel_heur_text.set("Heuristic Method:")
-sel_heur_label.pack()
-selected_heuristic.set(heuristic_options[0]) # euclidean default
-
-heuristic_dropdown = tk.OptionMenu(window, selected_heuristic, *heuristic_options)
-heuristic_dropdown.pack()
-
-sel_heur_text = tk.StringVar()
-sel_heur_label = tk.Label( window, textvariable=sel_heur_text)
-sel_heur_text.set("Heuristic Value:")
-sel_heur_label.pack()
-
-weight_variable = tk.DoubleVar()
-weight_variable.set(1.0)
-heuristic_weight = tk.Scale(window, from_=-10.0, to=10.0, resolution=0.1, orient=tk.HORIZONTAL, variable=weight_variable)
-heuristic_weight.pack()
-
-smoothing_flag = tk.IntVar()
-smoothing_cb = tk.Checkbutton(window, text='Smoothing',variable=smoothing_flag, onvalue=1, offvalue=0)
-smoothing_cb.pack()
-
-window.mainloop()
+selected_heuristic = heuristic_options[0]
+button_width = 160
+button_height = 40
+button_coords = {
+    "euclidean": (1008, 100),
+    "manhattan": (1008, 148),
+    "chebbyshev": (1008, 196),
+    "octile": (1008, 244),
+    "dijkstra": (1008, 292),
+}
+last_runtime = ""
+#sel_heur_text = tk.StringVar()
+#sel_heur_label = tk.Label( window, textvariable=sel_heur_text)
+#sel_heur_text.set("Heuristic Method:")
+#sel_heur_label.pack()
+#selected_heuristic.set(heuristic_options[0]) # euclidean default
+#
+#heuristic_dropdown = tk.OptionMenu(window, selected_heuristic, *heuristic_options)
+#heuristic_dropdown.pack()
+#
+#sel_heur_text = tk.StringVar()
+#sel_heur_label = tk.Label( window, textvariable=sel_heur_text)
+#sel_heur_text.set("Heuristic Value:")
+#sel_heur_label.pack()
+#
+#weight_variable = tk.DoubleVar()
+#weight_variable.set(1.0)
+#heuristic_weight = tk.Scale(window, from_=-10.0, to=10.0, resolution=0.1, orient=tk.HORIZONTAL, variable=weight_variable)
+#heuristic_weight.pack()
+#
+#smoothing_flag = tk.IntVar()
+#smoothing_cb = tk.Checkbutton(window, text='Smoothing',variable=smoothing_flag, onvalue=1, offvalue=0)
+#smoothing_cb.pack()
 
 # -------- main loop -----------
+monospace = pygame.font.SysFont("monospace", 18)
+big_monospace = pygame.font.SysFont("monospace", 24)
 while not done:
     for event in pygame.event.get(): 
         if event.type == pygame.QUIT:  
@@ -244,7 +262,12 @@ while not done:
             if (start_coords[ROW] != -1 or start_coords[COL] != -1) and \
                     (end_coords[ROW] != -1 or end_coords[COL] != -1):
                 process_valid_neighbors()
+                tic = time.perf_counter()
                 path = solve_astar()
+                toc = time.perf_counter()
+                last_runtime = f"{toc - tic:0.4f}s"
+                grid[start_coords[ROW]][start_coords[COL]] = START
+                grid[end_coords[ROW]][end_coords[COL]] = END
                 if len(path) == 0:
                     print("a star failed")
                 else:
@@ -266,6 +289,13 @@ while not done:
 
             if row == end_coords[ROW] and column == end_coords[COL]:
                 end_coords = (-1, -1)
+        else:
+            for heuristic in button_coords:
+                x_pos = button_coords[heuristic][0]
+                y_pos = button_coords[heuristic][1]
+                if x_pos <= mouse_pos[0] <= x_pos + button_width and \
+                   y_pos <= mouse_pos[1] <= y_pos + button_height:
+                    selected_heuristic = heuristic
     
     if pygame.mouse.get_pressed()[2]: # right mouse button
         pos = pygame.mouse.get_pos()
@@ -307,7 +337,33 @@ while not done:
             grid[row][column] = END
 
     screen.fill(BLACK)
-
+    
+    current_heuristic_label = monospace.render("Current Heuristic:", True, (255,255,255))
+    screen.blit(current_heuristic_label, (1008, 8))
+    
+    current_heuristic_value = monospace.render(selected_heuristic, True, (255,255,0))
+    screen.blit(current_heuristic_value, (1008, 26))
+    
+    timer_label = monospace.render("Runtime:", True, (255,255,255))
+    screen.blit(timer_label, (1008, 52))
+    timer_value = monospace.render(last_runtime, True, (255,255,255))
+    screen.blit(timer_value, (1008, 70))
+    
+    mouse_pos = pygame.mouse.get_pos()
+    margin_left = 12
+    margin_top = 7
+    for heuristic in button_coords:
+        x_pos = button_coords[heuristic][0]
+        y_pos = button_coords[heuristic][1]
+        button_label = big_monospace.render(heuristic, True, WHITE)
+        if (x_pos <= mouse_pos[0] <= x_pos + button_width and \
+           y_pos <= mouse_pos[1] <= y_pos + button_height) or \
+            heuristic == selected_heuristic: 
+            pygame.draw.rect(screen, LIGHT_GREY,[x_pos , y_pos, button_width, button_height])
+        else:
+            pygame.draw.rect(screen, DARK_GREY, [x_pos, y_pos, button_width, button_height]) 
+        screen.blit(button_label, (margin_left + x_pos ,  margin_top + y_pos)) 
+    
     # draw grid
     for row in range(GRID_SIZE):
         for column in range(GRID_SIZE):
@@ -320,6 +376,8 @@ while not done:
                 color = RED
             elif grid[row][column] == PATH:
                 color = BLUE
+            elif grid[row][column] == CHECKED:
+                color = ORCHID
             pygame.draw.rect(screen,
                              color,
                              [(MARGIN + WIDTH) * column + MARGIN,
